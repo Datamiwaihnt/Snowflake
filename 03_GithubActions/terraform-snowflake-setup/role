@@ -1,0 +1,253 @@
+role: 
+    name: TERRAFORM_TEST_01_001_ROLE
+    create_role: True
+
+//
+role: 
+    name: TERRAFORM_TEST_01_002_ROLE
+    comment: Terraformテスト1-2用ロール
+    create_role: True
+    database_priv:
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE]
+    warehouse_priv: 
+      - warehouse_name: TERRAFORM_TEST_01_WH
+        priv_type: [USAGE]
+    resource_monitor_priv: 
+      - resource_monitor_name: TERRAFORM_TEST_01_RM
+        priv_type: [MONITOR]
+    schema_priv: 
+      - schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [USAGE]
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE]
+        all_option: True
+        future_option: True
+    schema_object_priv: 
+      - object_type: TABLE
+        object_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA.TBL_TERRAFORM_TEST_01
+        priv_type: [SELECT]
+      - object_type: [TABLES]
+        schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [SELECT]
+        all_option: True
+        future_option: True
+      - object_type: [TABLES]
+        database_name: TERRAFORM_TEST_01_DB
+        priv_type: [SELECT]
+        all_option: True
+        future_option: True
+    parent_role: [TERRAFORM_TEST_PARENT_ROLE]
+    global_priv: [EXECUTE TASK]
+//
+role: 
+    name: TERRAFORM_TEST_01_003_ROLE
+    comment: Terraformテスト1-3用ロール
+    create_role: True
+    database_priv:
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE, MODIFY]
+      - database_name: TERRAFORM_TEST_02_DB
+        priv_type: [USAGE, MODIFY]
+    warehouse_priv: 
+      - warehouse_name: TERRAFORM_TEST_01_WH
+        priv_type: [USAGE, MODIFY]
+      - warehouse_name: TERRAFORM_TEST_02_WH
+        priv_type: [USAGE, MODIFY]
+    resource_monitor_priv: 
+      - resource_monitor_name: TERRAFORM_TEST_01_RM
+        priv_type: [MONITOR, MODIFY]
+      - resource_monitor_name: TERRAFORM_TEST_02_RM
+        priv_type: [MONITOR, MODIFY]
+    schema_priv: 
+      - schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [USAGE, MODIFY]
+      - schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_02_SCHEMA
+        priv_type: [USAGE, MODIFY]
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE, MODIFY]
+        all_option: True
+        future_option: True
+      - database_name: TERRAFORM_TEST_02_DB
+        priv_type: [USAGE, MODIFY]
+        all_option: True
+        future_option: True
+    schema_object_priv: 
+      - object_type: TABLE
+        object_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA.TBL_TERRAFORM_TEST_01
+        priv_type: [SELECT, INSERT]
+      - object_type: TABLE
+        object_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA.TBL_TERRAFORM_TEST_02
+        priv_type: [SELECT, INSERT]
+      - object_type: [TABLES, VIEWS]
+        schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [SELECT, INSERT]
+        all_option: True
+        future_option: True
+      - object_type: [TABLES, VIEWS]
+        schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_02_SCHEMA
+        priv_type: [SELECT, INSERT]
+        all_option: True
+        future_option: True
+      - object_type: [TABLES, VIEWS]
+        database_name: TERRAFORM_TEST_01_DB
+        priv_type: [SELECT, INSERT]
+        all_option: True
+        future_option: True
+      - object_type: [TABLES, VIEWS]
+        database_name: TERRAFORM_TEST_02_DB
+        priv_type: [SELECT, INSERT]
+        all_option: True
+        future_option: True
+    parent_role: [TERRAFORM_TEST_PARENT_ROLE, SYSADMIN]
+    global_priv: [EXECUTE TASK, RESOLVE ALL]
+
+//
+role: 
+    name: TERRAFORM_TEST_01_005_ROLE
+    comment: Terraformテスト1-5用ロール
+    create_role: False
+    database_priv:
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE]
+
+
+//
+role: 
+    name: TERRAFORM_TEST_01_007_ROLE
+    comment: Terraformテスト1-7用ロール
+    create_role: True
+    schema_priv: 
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE]
+        all_option: False
+        future_option: False
+    schema_object_priv: 
+      - object_type: [TABLES]
+        schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [SELECT]
+        all_option: False
+        future_option: False
+      - object_type: [TABLES]
+        database_name: TERRAFORM_TEST_01_DB
+        priv_type: [SELECT]
+        all_option: False
+        future_option: False
+
+//
+role: 
+    name: TERRAFORM_TEST_01_010_ROLE
+    comment: Terraformテスト1-10用ロール
+    create_role: True
+    schema_object_priv: 
+      - object_type: TABLE
+        object_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA.TBL_TERRAFORM_TEST_01
+        priv_type: [OWNERSHIP]
+      - object_type: [TABLES]
+        schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [OWNERSHIP]
+        all_option: True
+        future_option: True
+      - object_type: [TABLES]
+        database_name: TERRAFORM_TEST_01_DB
+        priv_type: [OWNERSHIP]
+        all_option: True
+        future_option: True
+//
+system_role: 
+    system_name: TERRAFORM_TEST_SYS01
+    create_role: True
+
+//
+system_role: 
+    system_name: TERRAFORM_TEST_SYS03
+    comment: Terraformテスト1-13用ロール
+    create_role: True
+    database_priv:
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE]
+    warehouse_priv: 
+      - warehouse_name: TERRAFORM_TEST_01_WH
+        priv_type: [USAGE]
+    resource_monitor_priv: 
+      - resource_monitor_name: TERRAFORM_TEST_01_RM
+        priv_type: [MONITOR]
+    schema_priv: 
+      - schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [USAGE]
+      - database_name: TERRAFORM_TEST_01_DB
+        priv_type: [USAGE]
+        all_option: True
+        future_option: True
+    schema_object_priv: 
+      - object_type: TABLE
+        object_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA.TBL_TERRAFORM_TEST_01
+        priv_type: [SELECT]
+      - object_type: [TABLES]
+        schema_name: TERRAFORM_TEST_01_DB.TERRAFORM_TEST_01_SCHEMA
+        priv_type: [SELECT]
+        all_option: True
+        future_option: True
+      - object_type: [TABLES]
+        database_name: TERRAFORM_TEST_01_DB
+        priv_type: [SELECT]
+        all_option: True
+        future_option: True
+    parent_role: [TERRAFORM_TEST_PARENT_ROLE]
+    global_priv: [EXECUTE TASK]
+
+//
+bind_role: 
+    database_name: TERRAFORM_TEST_01_DB
+    schema_name : TERRAFORM_TEST_01_SCHEMA
+    create_role: True
+//
+bind_userdb_write_role: 
+    user_project_id: TERRAFORM_TEST
+    create_role: True
+//
+bind_userdb_read_role: 
+    user_project_id: TERRAFORM_TEST
+    create_role: True
+//
+bind_publicationdb_write_role: 
+    user_project_id: TERRAFORM_TEST
+    create_role: True
+//
+bind_publicationdb_read_role: 
+    user_project_id: TERRAFORM_TEST
+    create_role: True
+
+//
+- user
+user: 
+    - name: TERRAFORM_TEST_01_039_USER
+      create_user: True
+//
+user: 
+    name: TERRAFORM_TEST_01_040_USER
+    default_warehouse: TERRAFORM_TEST_01_WH
+    default_namespace: TERRAFORM_TEST_0001_DB
+    default_role: TERRAFORM_TEST_ROLE
+    default_secondary_roles: 'ALL' 
+    rsa_public_key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApi7SzN+X+l4lZEkIClWf z1LFs5fRHJ/C91zZ/12X/Mpimc2JA63Teyn+AkYoMNXc27PgL8xXWx3CBO7bFOo2 C1mjJQXnICJMFaW4jlINLfKASBxwIExyewVWCyw30SQ7G3pSqRfb7L58wEOoS8a7 Py0N/GaxQEVzJu695a+Hif+O91rt1xCl7Xh2+5Fy4XEKpejiczjwzibIBClT08GL d8y4EiG7YnpiQHIYq0Qxr4iD8QwPPEf22Zpj1uAoGJ9cWdyMQUoYI66scvV6TKWJ njddNuSZkz8Vij5Ie/JLs14GezATivy2Zt5ETvUP4U6ejI5eQCa0s8I7zhUQZ6QK lQIDAQAC'
+    rsa_public_key_2: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApi7SzN+X+l4lZEkIClWf z1LFs5fRHJ/C91zZ/12X/Mpimc2JA63Teyn+AkYoMNXc27PgL8xXWx3CBO7bFOo2 C1mjJQXnICJMFaW4jlINLfKASBxwIExyewVWCyw30SQ7G3pSqRfb7L58wEOoS8a7 Py0N/GaxQEVzJu695a+Hif+O91rt1xCl7Xh2+5Fy4XEKpejiczjwzibIBClT08GL d8y4EiG7YnpiQHIYq0Qxr4iD8QwPPEf22Zpj1uAoGJ9cWdyMQUoYI66scvV6TKWJ njddNuSZkz8Vij5Ie/JLs14GezATivy2Zt5ETvUP4U6ejI5eQCa0s8I7zhUQZ6QK lQIDAQAC'
+    network_policy: TERRAFORM_NW
+    statement_timeout_in_seconds: 10000
+    client_session_keep_alive: True
+    comment: "Terrformテスト用ユーザ"
+    create_user: True
+    granted_role: [TERRAFORM_TEST_ROLE]
+//
+user: 
+    system_name: TERRAFORM_TEST_01_045
+    default_namespace: TERRAFORM_TEST_0001_DB
+    default_secondary_roles: 'ALL' 
+    rsa_public_key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApi7SzN+X+l4lZEkIClWf z1LFs5fRHJ/C91zZ/12X/Mpimc2JA63Teyn+AkYoMNXc27PgL8xXWx3CBO7bFOo2 C1mjJQXnICJMFaW4jlINLfKASBxwIExyewVWCyw30SQ7G3pSqRfb7L58wEOoS8a7 Py0N/GaxQEVzJu695a+Hif+O91rt1xCl7Xh2+5Fy4XEKpejiczjwzibIBClT08GL d8y4EiG7YnpiQHIYq0Qxr4iD8QwPPEf22Zpj1uAoGJ9cWdyMQUoYI66scvV6TKWJ njddNuSZkz8Vij5Ie/JLs14GezATivy2Zt5ETvUP4U6ejI5eQCa0s8I7zhUQZ6QK lQIDAQAC'
+    rsa_public_key_2: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApi7SzN+X+l4lZEkIClWf z1LFs5fRHJ/C91zZ/12X/Mpimc2JA63Teyn+AkYoMNXc27PgL8xXWx3CBO7bFOo2 C1mjJQXnICJMFaW4jlINLfKASBxwIExyewVWCyw30SQ7G3pSqRfb7L58wEOoS8a7 Py0N/GaxQEVzJu695a+Hif+O91rt1xCl7Xh2+5Fy4XEKpejiczjwzibIBClT08GL d8y4EiG7YnpiQHIYq0Qxr4iD8QwPPEf22Zpj1uAoGJ9cWdyMQUoYI66scvV6TKWJ njddNuSZkz8Vij5Ie/JLs14GezATivy2Zt5ETvUP4U6ejI5eQCa0s8I7zhUQZ6QK lQIDAQAC'
+    network_policy: TERRAFORM_NW
+    statement_timeout_in_seconds: 10000
+    client_session_keep_alive: True
+    comment: "Terrformテスト用ユーザ"
+    create_user: True
+    granted_role: [TERRAFORM_TEST_ROLE]
