@@ -277,8 +277,6 @@ END;
 
 GRANT USAGE ON PROCEDURE code_schema.localSpill4(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
 
-
-
 //キュー待ち発生状況
 CREATE OR REPLACE PROCEDURE code_schema.localSpill5(
   warehouse STRING,
@@ -341,7 +339,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill5(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill5(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 
@@ -388,7 +386,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill6(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill6(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //trxブロック発生状況
@@ -425,7 +423,6 @@ DECLARE
         WHERE execution_status = 'SUCCESS'
           AND warehouse_name = :warehouse
           AND warehouse_size IS NOT NULL
-          AND BYTES_SCANNED > 0
           AND CONVERT_TIMEZONE('Asia/Tokyo', TO_TIMESTAMP_NTZ(START_TIME)) 
               BETWEEN :begin_str AND :end_str
         GROUP BY ALL
@@ -454,9 +451,9 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill7(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill7(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
-//キュー待ちが長いSQL
+//TXブロック待ち時間が長いSQL
 CREATE OR REPLACE PROCEDURE code_schema.localSpill8(
   warehouse STRING,
   begin_str STRING,
@@ -499,7 +496,343 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill8(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill8(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
+
+//クエリ実行時間の傾向
+CREATE OR REPLACE PROCEDURE code_schema.localSpill9(
+  warehouse STRING,
+  begin_str STRING,
+  end_str STRING
+)
+RETURNS TABLE(
+  WAREHOUSE_NAME STRING,
+  WAREHOUSE_SIZE STRING,
+  TOTAL_COUNT_SQL NUMBER,
+  ELAPSED_TIME_RANGE STRING,
+  SQL_COUNT NUMBER,
+  PERCENT_SQL_COUNT STRING
+)
+LANGUAGE SQL
+AS
+DECLARE
+  res RESULTSET DEFAULT (
+    WITH sqlcnt_per_range AS (
+      SELECT * FROM (
+        SELECT
+          warehouse_name,
+          warehouse_size,
+          COUNT(*) total_count_sql,
+          COUNT(CASE WHEN (total_elapsed_time / 1000) > 0   and (total_elapsed_time / 1000) <= 1 THEN 1 ELSE NULL END)      AS "1: 0s < ELAPSED_TIME <= 1s", 
+          COUNT(CASE WHEN (total_elapsed_time / 1000) > 1   and (total_elapsed_time / 1000) <= 10 THEN 1 ELSE NULL END)     AS "2: 1s < ELAPSED_TIME <= 10s", 
+          COUNT(CASE WHEN (total_elapsed_time / 1000) > 10  and (total_elapsed_time / 1000) <= 60 THEN 1 ELSE NULL END)     AS "3: 10s < ELAPSED_TIME <= 60s",
+          COUNT(CASE WHEN (total_elapsed_time / 1000) > 60  and (total_elapsed_time / 1000) <= 600 THEN 1 ELSE NULL END)    AS "4: 60s < ELAPSED_TIME <= 600s",
+          COUNT(CASE WHEN (total_elapsed_time / 1000) > 600 and (total_elapsed_time / 1000) <= 3600 THEN 1 ELSE NULL END)   AS "5: 600s < ELAPSED_TIME <= 3600s",
+          COUNT(CASE WHEN (total_elapsed_time / 1000) > 3600 THEN 1 ELSE NULL END) AS "6: 3600s < ELAPSED_TIME", 
+
+       FROM snowflake.account_usage.query_history
+        WHERE execution_status = 'SUCCESS'
+          AND warehouse_name = :warehouse
+          AND warehouse_size IS NOT NULL
+          AND total_elapsed_time > 0
+          AND CONVERT_TIMEZONE('Asia/Tokyo', TO_TIMESTAMP_NTZ(START_TIME)) 
+              BETWEEN :begin_str AND :end_str
+        GROUP BY ALL
+      )
+      UNPIVOT (
+        sql_count FOR elapsed_time_range IN (
+              "1: 0s < ELAPSED_TIME <= 1s",
+              "2: 1s < ELAPSED_TIME <= 10s",
+              "3: 10s < ELAPSED_TIME <= 60s",
+              "4: 60s < ELAPSED_TIME <= 600s",
+              "5: 600s < ELAPSED_TIME <= 3600s",
+              "6: 3600s < ELAPSED_TIME"
+
+        )
+      )
+    )
+    SELECT 
+      WAREHOUSE_NAME,
+      WAREHOUSE_SIZE,
+      TOTAL_COUNT_SQL,
+      ELAPSED_TIME_RANGE,
+      SQL_COUNT,
+      round(sql_count / total_count_sql * 100, 3) || '%' as PERCENT_SQL_COUNT
+    FROM sqlcnt_per_range
+  );
+BEGIN
+  RETURN TABLE(res);
+END;
+
+GRANT USAGE ON PROCEDURE code_schema.localSpill9(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
+
+
+//クエリ実行時間が長いSQL
+CREATE OR REPLACE PROCEDURE code_schema.localSpill10(
+  warehouse STRING,
+  begin_str STRING,
+  end_str STRING
+)
+RETURNS TABLE(
+  WAREHOUSE_NAME STRING,
+  WAREHOUSE_SIZE STRING,
+  QUERY_ID STRING,
+  QUERY_TEXT STRING,
+  START_TIME TIMESTAMP_TZ,
+  TOTAL_ELAPSED_TIME_S NUMBER
+)
+LANGUAGE SQL
+AS
+DECLARE
+  res RESULTSET DEFAULT (
+     select
+        warehouse_name,
+        warehouse_size,
+        query_id,
+        query_text,
+        CONVERT_TIMEZONE('Asia/Tokyo',to_timestamp_ntz(START_TIME)) start_time,
+        round(total_elapsed_time/1000,1) total_elapsed_time_s	       
+    from
+        snowflake.account_usage.query_history
+    where
+        execution_status = 'SUCCESS'
+    and warehouse_name = :warehouse
+    and warehouse_size is not null
+    and CONVERT_TIMEZONE('Asia/Tokyo',to_timestamp_ntz(START_TIME)) BETWEEN :begin_str AND :end_str
+    and total_elapsed_time_s > 0 
+    order by total_elapsed_time_s desc
+    );
+BEGIN
+  RETURN TABLE(res);
+END;
+
+GRANT USAGE ON PROCEDURE code_schema.localSpill10(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
+
+//クエリスキャンサイズの傾向
+CREATE OR REPLACE PROCEDURE code_schema.localSpill11(
+  warehouse STRING,
+  begin_str STRING,
+  end_str STRING
+)
+RETURNS TABLE(
+  WAREHOUSE_NAME STRING,
+  WAREHOUSE_SIZE STRING,
+  TOTAL_COUNT_SQL NUMBER,
+  SCAN_SIZE_RANGE STRING,
+  SQL_COUNT NUMBER,
+  PERCENT_SQL_COUNT STRING
+)
+LANGUAGE SQL
+AS
+DECLARE
+  res RESULTSET DEFAULT (
+    WITH sqlcnt_per_scansize AS (
+      SELECT * FROM (
+        SELECT
+          warehouse_name,
+          warehouse_size,
+          COUNT(*) total_count_sql,
+          COUNT(CASE WHEN (BYTES_SCANNED)                > 0  and (BYTES_SCANNED/1024/1024/1024) <= 1   THEN 1 ELSE NULL END) AS "1: 0B < SCAN_SIZE <= 1GB",					
+          COUNT(CASE WHEN (BYTES_SCANNED/1024/1024/1024) > 1  and (BYTES_SCANNED/1024/1024/1024) <= 20  THEN 1 ELSE NULL END) AS "2: 1GB < SCAN_SIZE <= 20GB",   					
+          COUNT(CASE WHEN (BYTES_SCANNED/1024/1024/1024) > 20 and (BYTES_SCANNED/1024/1024/1024) <= 50  THEN 1 ELSE NULL END) AS "3: 20GB < SCAN_SIZE <= 50GB",					
+          COUNT(CASE WHEN (BYTES_SCANNED/1024/1024/1024) > 50 THEN 1 ELSE NULL END)                                           AS "4: 50GB < SCAN_SIZE"				
+       FROM snowflake.account_usage.query_history
+        WHERE execution_status = 'SUCCESS'
+          AND warehouse_name = :warehouse
+          AND warehouse_size IS NOT NULL
+          AND BYTES_SCANNED > 0
+          AND CONVERT_TIMEZONE('Asia/Tokyo', TO_TIMESTAMP_NTZ(START_TIME)) 
+              BETWEEN :begin_str AND :end_str
+        GROUP BY ALL
+      )
+      UNPIVOT (
+        sql_count FOR scan_size_range IN (
+            "1: 0B < SCAN_SIZE <= 1GB",					
+            "2: 1GB < SCAN_SIZE <= 20GB", 					
+            "3: 20GB < SCAN_SIZE <= 50GB",					
+            "4: 50GB < SCAN_SIZE"					
+        )
+      )
+    )
+    SELECT 
+      WAREHOUSE_NAME,
+      WAREHOUSE_SIZE,
+      TOTAL_COUNT_SQL,
+      SCAN_SIZE_RANGE,
+      SQL_COUNT,
+      round(sql_count / total_count_sql * 100, 1) || '%' as PERCENT_SQL_COUNT
+    FROM sqlcnt_per_scansize
+  );
+BEGIN
+  RETURN TABLE(res);
+END;
+
+GRANT USAGE ON PROCEDURE code_schema.localSpill11(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
+
+//対象クエリスキャンサイズ範囲のSQL
+CREATE OR REPLACE PROCEDURE code_schema.localSpill12(
+  warehouse STRING,
+  begin_str STRING,
+  end_str STRING,
+  minNumber NUMBER,
+  maxNumber NUMBER
+)
+RETURNS TABLE(
+  WAREHOUSE_NAME STRING,
+  WAREHOUSE_SIZE STRING,
+  QUERY_ID STRING,
+  QUERY_TEXT STRING,
+  BYTES_SCANNED_GB NUMBER(10,2),
+  TOTAL_ELAPSED_TIME_S NUMBER(10,2)
+)
+LANGUAGE SQL
+AS
+DECLARE
+  res RESULTSET DEFAULT (
+     select
+        warehouse_name,
+        warehouse_size,
+        query_id,
+        query_text,
+        round(BYTES_SCANNED/1024/1024/1024,2) AS BYTES_SCANNED_GB,
+        round(total_elapsed_time / 1000,2) AS total_elapsed_time_s
+    from
+        snowflake.account_usage.query_history
+    where
+        execution_status = 'SUCCESS'
+    and warehouse_name = :warehouse
+    and warehouse_size is not null
+    and ROUND(BYTES_SCANNED/1024/1024/1024,2) > :minNumber
+    and ROUND(BYTES_SCANNED/1024/1024/1024,2) <= :maxNumber
+    and CONVERT_TIMEZONE('Asia/Tokyo',to_timestamp_ntz(START_TIME)) BETWEEN :begin_str AND :end_str
+    order by ROUND(BYTES_SCANNED/1024/1024/1024,2) DESC
+    );
+BEGIN
+  RETURN TABLE(res);
+END;
+
+GRANT USAGE ON PROCEDURE code_schema.localSpill12(STRING,STRING,STRING,NUMBER,NUMBER) TO APPLICATION ROLE func_cost_estimate;
+
+
+
+
+//スキャンパーティション割合
+CREATE OR REPLACE PROCEDURE code_schema.localSpill13(
+  warehouse STRING,
+  begin_str STRING,
+  end_str STRING
+)
+RETURNS TABLE(
+  WAREHOUSE_NAME STRING,
+  WAREHOUSE_SIZE STRING,
+  TOTAL_COUNT_SQL NUMBER,
+  SCAN_PARTITION_RATO_RANGE STRING,
+  SQL_COUNT NUMBER,
+  PERCENT_SQL_COUNT STRING
+)
+LANGUAGE SQL
+AS
+DECLARE
+  res RESULTSET DEFAULT (
+      with scan_partition_ratio as (
+      SELECT * FROM (
+        SELECT
+          warehouse_name,					
+          warehouse_size,					
+          COUNT(*) total_count_sql,					
+          COUNT(CASE WHEN PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 > 0  and PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 <= 1   THEN 1 ELSE NULL END) AS "1: 0 < SCAN_P_RATIO <= 1%",					
+          COUNT(CASE WHEN PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 > 1  and PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 <= 10  THEN 1 ELSE NULL END) AS "2: 1 < SCAN_P_RATIO <= 10%",					
+          COUNT(CASE WHEN PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 > 10 and PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 <= 30  THEN 1 ELSE NULL END) AS "3: 10 < SCAN_P_RATIO <= 30%",   					
+          COUNT(CASE WHEN PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 > 30 and PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 <= 60  THEN 1 ELSE NULL END) AS "4: 30 < SCAN_P_RATIO <= 60%",					
+          COUNT(CASE WHEN PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 > 60 and PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 <= 90  THEN 1 ELSE NULL END) AS "5: 60 < SCAN_P_RATIO <= 90%",					
+          COUNT(CASE WHEN PARTITIONS_SCANNED/PARTITIONS_TOTAL*100 > 90                                                    THEN 1 ELSE NULL END) AS "6: 90% < SCAN_P_RATIO"					
+       FROM snowflake.account_usage.query_history
+        WHERE execution_status = 'SUCCESS'
+          AND warehouse_name = :warehouse
+          AND warehouse_size IS NOT NULL
+          AND PARTITIONS_TOTAL > 0
+          AND CONVERT_TIMEZONE('Asia/Tokyo', TO_TIMESTAMP_NTZ(START_TIME)) 
+              BETWEEN :begin_str AND :end_str
+        GROUP BY ALL
+      )
+      UNPIVOT (
+        sql_count FOR SCAN_PARTITION_RATO_RANGE IN (
+              "1: 0 < SCAN_P_RATIO <= 1%",					
+              "2: 1 < SCAN_P_RATIO <= 10%",					
+              "3: 10 < SCAN_P_RATIO <= 30%", 					
+              "4: 30 < SCAN_P_RATIO <= 60%",					
+              "5: 60 < SCAN_P_RATIO <= 90%",					
+              "6: 90% < SCAN_P_RATIO"					
+            )
+      )
+    )
+    SELECT 
+      WAREHOUSE_NAME,
+      WAREHOUSE_SIZE,
+      TOTAL_COUNT_SQL,
+      SCAN_PARTITION_RATO_RANGE,
+      SQL_COUNT,
+      round(sql_count / total_count_sql * 100, 1) || '%' as PERCENT_SQL_COUNT
+    FROM scan_partition_ratio
+  );
+BEGIN
+  RETURN TABLE(res);
+END;
+
+GRANT USAGE ON PROCEDURE code_schema.localSpill13(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
+
+
+//フルスキャンSQL
+CREATE OR REPLACE PROCEDURE code_schema.localSpill14(
+  warehouse STRING,
+  begin_str STRING,
+  end_str STRING
+)
+RETURNS TABLE(
+  WAREHOUSE_NAME STRING,
+  WAREHOUSE_SIZE STRING,
+  QUERY_ID STRING,
+  QUERY_TEXT STRING,
+  "%SCAN_PARTITION_RATIO" NUMBER,
+  PARTITIONS_SCANNED NUMBER,
+  PARTITIONS_TOTAL NUMBER,
+  BYTES_SCANNED_GB NUMBER(10,2),
+  TOTAL_ELAPSED_TIME_S NUMBER(10,2)
+)
+LANGUAGE SQL
+AS
+DECLARE
+  res RESULTSET DEFAULT (
+    select
+      warehouse_name,			
+      warehouse_size,			
+      query_id,			
+      query_text,			
+      round(PARTITIONS_SCANNED/PARTITIONS_TOTAL*100,2) "%SCAN_PARTITION_RATIO" ,			
+      PARTITIONS_SCANNED,			
+      PARTITIONS_TOTAL,			
+      round(BYTES_SCANNED/1024/1024/1024,2) BYTES_SCANNED_GB,			
+      round(total_elapsed_time / 1000,2) total_elapsed_time_s			
+    from
+        snowflake.account_usage.query_history
+    where
+        execution_status = 'SUCCESS'
+    and warehouse_name = :warehouse
+    and warehouse_size is not null
+    and CONVERT_TIMEZONE('Asia/Tokyo',to_timestamp_ntz(START_TIME)) BETWEEN :begin_str AND :end_str
+    and (PARTITIONS_TOTAL > 0 and "%SCAN_PARTITION_RATIO" >= 90 and "%SCAN_PARTITION_RATIO" <= 100)	
+    order by "%SCAN_PARTITION_RATIO" desc, PARTITIONS_SCANNED desc
+    );
+BEGIN
+  RETURN TABLE(res);
+END;
+
+GRANT USAGE ON PROCEDURE code_schema.localSpill14(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
 
 
 //QueryAccelerationService
@@ -534,7 +867,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill15(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill15(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //WH簡易分析
@@ -628,7 +961,9 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill16(STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill16(STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
+
 
 //WH詳細分析
 CREATE OR REPLACE PROCEDURE code_schema.localSpill17(
@@ -917,4 +1252,6 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill17(STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill17(STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
+
+
