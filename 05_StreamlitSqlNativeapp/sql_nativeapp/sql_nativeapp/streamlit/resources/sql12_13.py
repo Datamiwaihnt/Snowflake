@@ -1,75 +1,96 @@
 import streamlit as st
 import pandas as pd
+import datetime
 from snowflake.snowpark.context import get_active_session
 import altair as alt
-import datetime as dt
 
-
-st.markdown("<h1 style='color:teal;'>クエリスキャンサイズ</h1>",unsafe_allow_html = True)
-st.write("")
 session = get_active_session()
 
-
-
-#クエリ定義 sql12,13共通
-@st.cache_data
+# ウェアハウス一覧を取得
+@st.cache_data(show_spinner=False)
 def show_warehouses():
+    # ストアドプロシージャの呼び出し
+    df = session.call("code_schema.show_warehouse_proc")  # Snowpark DataFrame
+    rows = df.collect()                         # ⬅️ クエリを実行して行を取得
+    rows_as_dict = [row.as_dict() for row in rows]  # ⬅️ 各行をdictに変換
+    return pd.DataFrame(rows_as_dict)  # Pandas DataFrame に変換
 
-    query = '''
-        show warehouses
-    '''
-    exe = session.sql(query).collect()
-    return exe
 
-# クエリ定義　sql13
+# フィルター条件　main13用
 def input_scan_range():
     
     minNumber = st.number_input("スキャンサイズの下限(GB)", value=0, placeholder="Type a number...")
     maxNumber = st.number_input("スキャンサイズの上限(GB)", value=10, placeholder="Type a number...")
-
-
     return minNumber,maxNumber
 
-
-
-#クエリ実行時間の特定
-def long_runnning_query(warehouse_name,key_prefix):
-
-    today = dt.date.today()
+# フィルター条件入力UI
+def get_filter_inputs(warehouse_name, key_suffix):
+    today = datetime.date.today()
     first_day = today.replace(day=1)
-    next_month = (today.replace(day=28) + dt.timedelta(days=4)).replace(day=1)
-    last_day = next_month - dt.timedelta(days=1)
-    
-    col1,col2,col3 = st.columns(3)
-    
+    next_month = (today.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+    last_day = next_month - datetime.timedelta(days=1)
+
+    col1, col2, col3 = st.columns(3)
+
     with col1:
         warehouse = st.selectbox(
             "ウェアハウスを選択",
             warehouse_name,
-            key=f'{key_prefix}warehouse_selectboxs'
+            key=f'warehouse_selectbox_sql_{key_suffix}'
         )
     with col2:
-        begin_date = st.date_input("開始日", value=first_day,key=f'{key_prefix}_date_begin_input')
-        begin_time = st.time_input("開始時刻",value=dt.time(0, 0),key=f'{key_prefix}_time_begin_input')
+        begin_date = st.date_input("開始日", value=first_day, key=f"begin_date_{key_suffix}")
+        begin_time = st.time_input("開始時刻", value=datetime.time(0, 0), key=f"begin_time_{key_suffix}")
 
     with col3:
-        end_date = st.date_input("終了日", value=last_day,key=f'{key_prefix}_date_end_input')
-        end_time = st.time_input("終了時刻",dt.time(23,59),key=f'{key_prefix}_time_end_input')
+        end_date = st.date_input("終了日", value=last_day, key=f"end_date_{key_suffix}")
+        end_time = st.time_input("終了時刻", value=datetime.time(23, 59), key=f"end_time_{key_suffix}")
 
-    begin_datetime = dt.datetime.combine(begin_date, begin_time)
-    end_datetime = dt.datetime.combine(end_date, end_time)
+    begin_dt = datetime.datetime.combine(begin_date, begin_time)
+    end_dt = datetime.datetime.combine(end_date, end_time)
 
-    begin_str = begin_datetime.strftime('%Y-%m-%d %H:%M:%S')
-    end_str = end_datetime.strftime('%Y-%m-%d %H:%M:%S')    
- 
-    return warehouse,begin_str, end_str
+    begin_str = begin_dt.strftime('%Y-%m-%d %H:%M:%S')
+    end_str = end_dt.strftime('%Y-%m-%d %H:%M:%S')
 
+    return warehouse, begin_str, end_str
 
+def execute_query11(warehouse,begin_str, end_str):
+    
+    df_query11 = session.call(
+        "code_schema.localSpill11",
+        warehouse,
+        begin_str,
+        end_str
+    )
 
-#sql12 クエリの実行
-def execute_query12(warehouse,begin_time,end_time):    
+    rows = df_query11.collect()
+    df = pd.DataFrame([row.as_dict() for row in rows])
+    if df.empty:
+        st.warning("該当するデータが存在しませんでした。")
+        return
+    st.write(rows)
 
-    query12 = f'''
+    df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
+
+    bar_order = [
+        "1: 0B < SCAN_SIZE <= 1GB",				
+        "2: 1GB < SCAN_SIZE <= 20GB",					
+        "3: 20GB < SCAN_SIZE <= 50GB",					
+        "4: 50GB < SCAN_SIZE"	
+    ]
+
+    bar_chart = alt.Chart(df).mark_bar().encode(
+        y=alt.Y('SCAN_SIZE_RANGE', sort=bar_order),
+        x=alt.X('SQL_COUNT'),
+        color='SCAN_SIZE_RANGE',
+        tooltip=['SCAN_SIZE_RANGE', 'SQL_COUNT']
+    ).properties(
+        title="クエリスキャンサイズ範囲ごとのSQL数"
+    )
+    
+    st.altair_chart(bar_chart, use_container_width=True)
+
+    query_text_sql11 = """
         with sqlcnt_per_scansize as (					
             select * from					
                 (					
@@ -88,7 +109,7 @@ def execute_query12(warehouse,begin_time,end_time):
                     and warehouse_name = '{warehouse}'				
                     and warehouse_size is not null					
                     and BYTES_SCANNED > 0
-                    and CONVERT_TIMEZONE('Asia/Tokyo', to_timestamp_ntz(START_TIME)) between '{begin_time}' AND '{end_time}'
+                    and CONVERT_TIMEZONE('Asia/Tokyo', to_timestamp_ntz(START_TIME)) between '{begin_str}' AND '{end_str}'
                     group by all					
                 )					
             unpivot (sql_count for scan_size_range in (					
@@ -99,53 +120,32 @@ def execute_query12(warehouse,begin_time,end_time):
             ))					
             )					
         select *, round(sql_count / total_count_sql * 100,1) ||'%' as "%SQL_COUNT" from sqlcnt_per_scansize;					
-    
-    '''
-    
-    
-    #クエリの実行
-    query_result = session.sql(query12).collect()
-    df = pd.DataFrame(query_result)
+    """.format(warehouse=warehouse, begin_str=begin_str, end_str=end_str)
 
+    with st.expander("実行されたクエリを表示", expanded=False):
+        st.code(query_text_sql11, language="sql")
+
+
+def execute_query12(warehouse,begin_str, end_str,minNumber,maxNumber):
+
+    df_query12 = session.call(
+        "code_schema.localSpill12",
+        warehouse,
+        begin_str,
+        end_str,
+        minNumber,
+        maxNumber
+    ) 
+
+    rows = df_query12.collect()
+    df = pd.DataFrame([row.as_dict() for row in rows])
     if df.empty:
         st.warning("該当するデータが存在しませんでした。")
         return
-       
-    #表の結果表示
-    st.write(df)
-
-    #データの準備
-    df['SQL_COUNT'] = df['%SQL_COUNT'].str.rstrip('%').astype(float)
-
-    scan_size_range = [
-        "1: 0B < SCAN_SIZE <= 1GB",					
-        "2: 1GB < SCAN_SIZE <= 20GB", 					
-        "3: 20GB < SCAN_SIZE <= 50GB",					
-        "4: 50GB < SCAN_SIZE"					
-    ]
-
-    #bar_chartの描画
-    bar_chart = alt.Chart(df).mark_bar().encode(
-        y=alt.Y('SCAN_SIZE_RANGE',sort=scan_size_range),
-        x=alt.X('SQL_COUNT'),
-        color = 'SCAN_SIZE_RANGE',
-        tooltip=['SCAN_SIZE_RANGE','SQL_COUNT']
-    ).properties(
-        title='クエリスキャンサイズ範囲ごとのSQL数'
-    )
-
-    st.altair_chart(bar_chart,use_container_width=True) 
-    
-    with st.expander("実行したSQL",expanded=False):
-        st.code(query12,language='sql')
+    st.write(rows)
 
 
-#クエリ定義 sql13
-
-
-def execute_query13(warehouse,begin_time,end_time,minNumber,maxNumber):    
-
-    query13 = f'''
+    query_text_sql12 = """
         select 
             warehouse_name,
             warehouse_size,
@@ -161,58 +161,39 @@ def execute_query13(warehouse,begin_time,end_time,minNumber,maxNumber):
             and warehouse_size is not null
             and BYTES_SCANNED_GB > '{minNumber}'
             and BYTES_SCANNED_GB <= '{maxNumber}'
-            and CONVERT_TIMEZONE('Asia/Tokyo', to_timestamp_ntz(START_TIME)) between '{begin_time}' AND '{end_time}'       
+            and CONVERT_TIMEZONE('Asia/Tokyo', to_timestamp_ntz(START_TIME)) between '{begin_str}' AND '{end_str}'       
         order by BYTES_SCANNED_GB desc  
-        ;
+    ;
+""".format(warehouse=warehouse, minNumber=minNumber, maxNumber=maxNumber, begin_str=begin_str, end_str=end_str)
 
-    '''
-    
-    
-    #クエリの実行
-    query_result = session.sql(query13).collect()
-    df = pd.DataFrame(query_result)
 
-    if df.empty:
-        st.warning("該当するデータが存在しませんでした。")
-        return
+    with st.expander("実行されたクエリを表示", expanded=False):
+        st.code(query_text_sql12, language="sql")
 
-    #表の結果表示
-    st.write(df)
-
-    with st.expander("実行したSQL",expanded=False):
-        st.code(query13,language='sql')
-    
 
 def main12():
-    result = show_warehouses()
-    df = pd.DataFrame(result)
-    name = df[['name']]
-    warehouse,begin_str,end_str = long_runnning_query(name,key_prefix='sql12')
-
-    if st.button("クエリ実行",key='execute_query12_button'):
-        execute_query12(warehouse, begin_str,end_str)
-
+    df = show_warehouses()
+    name = df["name"].tolist()
+    warehouse, begin_str, end_str = get_filter_inputs(name, key_suffix="tab12")
+    
+    if st.button("クエリ実行", key="execute_query12"):
+        execute_query11(warehouse, begin_str, end_str)
 
 def main13():
-    result = show_warehouses()
-    df = pd.DataFrame(result)
-    name = df[['name']]
-    warehouse,begin_time,end_time = long_runnning_query(name,key_prefix='sql11')
-    minNumber,maxNumber = input_scan_range()
-    if st.button("クエリ実行",key='execute_query13_button'):
-        execute_query13(warehouse, begin_time, end_time,minNumber,maxNumber)
+    df = show_warehouses()
+    name = df["name"].tolist()
+    warehouse, begin_str, end_str = get_filter_inputs(name, key_suffix="tab13")
+    minNumber,maxNumber = input_scan_range()   
+    if st.button("クエリ実行", key="execute_query13"):
+        execute_query12(warehouse, begin_str, end_str,minNumber,maxNumber)
 
-
-
-
-
-##UI定義
-tab1, tab2 = st.tabs(["クエリスキャンサイズ範囲ごとのSQL数", "クエリスキャンサイズが多いSQL"])
-with tab1:
-    st.write("")
-    st.markdown("### クエリスキャンサイズ範囲ごとのSQL数")
+# タイトル表示
+st.markdown("<h1 style='color:teal;'>クエリスキャンサイズ</h1>",unsafe_allow_html = True)
+# タブUI
+tab8, tab9 = st.tabs(["クエリスキャンサイズ範囲ごとのSQL数", "クエリスキャンサイズが多いSQL"])
+with tab8:
+    st.markdown("### クエリスキャンサイズ範囲ごとのSQL数",unsafe_allow_html = True)
     main12()
-with tab2:
-    st.write("")
-    st.markdown("### クエリスキャンサイズが多いSQL")
+with tab9:
+    st.markdown("### クエリスキャンサイズが多いSQL",unsafe_allow_html = True)
     main13()
