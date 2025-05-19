@@ -32,7 +32,24 @@ def get_filter_inputs(key_suffix):
 
 # クエリ実行 sql17
 def execute_query17(begin_str, end_str):    
-    sql17 = f"""
+
+    df_query17 = session.call(
+    "code_schema.localSpill16",
+    begin_str,
+    end_str
+)
+    
+
+    rows = df_query17.collect()
+    df = pd.DataFrame([row.as_dict() for row in rows])
+    if df.empty:
+        st.warning("該当するデータが存在しませんでした。")
+        return
+    st.write(rows)
+
+ 
+    query_text_sql17 = """
+
     with credits as (
     select 
         warehouse_name::varchar warehouse_name,
@@ -97,20 +114,11 @@ def execute_query17(begin_str, end_str):
             when '4X-Large' then 8
             else 9
         end desc,
-        c.credits_used desc
-    ;
-    """    
-    
-    query_result = session.sql(sql17).collect()
-    df = pd.DataFrame(query_result)
+        c.credits_used desc;
+    """.format(begin_str=begin_str, end_str=end_str)
 
-    if df.empty:
-        st.warning("該当するデータが存在しませんでした。")
-        return
-
-    st.write(df)
-    with st.expander("実行したSQL",expanded=False):
-        st.code(sql17,language='sql')
+    with st.expander("実行されたクエリを表示", expanded=False):
+        st.code(query_text_sql17, language="sql")
 
 
 # WH全体分析(簡易版) sql17

@@ -45,33 +45,22 @@ def get_filter_inputs(warehouse_name, key_suffix):
 
 # クエリ実行 sql16
 def execute_query16(warehouse, begin_str, end_str):    
-    sql16 = f"""
-    SELECT 
-        query_id, 
-        query_text,
-        eligible_query_acceleration_time,
-        UPPER_LIMIT_SCALE_FACTOR
-    FROM 
-        snowflake.account_usage.QUERY_ACCELERATION_ELIGIBLE
-    where 
-        warehouse_name = '{warehouse}'
-    and CONVERT_TIMEZONE('Asia/Tokyo',to_timestamp_ntz(START_TIME)) between '{begin_str}' AND '{end_str}'
-    ORDER BY eligible_query_acceleration_time DESC
-    ;
-    """    
-    
-    query_result = session.sql(sql16).collect()
-    df = pd.DataFrame(query_result)
 
+    df_query16 = session.call(
+    "code_schema.localSpill15",
+    warehouse,
+    begin_str,
+    end_str
+)
+    
+
+    rows = df_query16.collect()
+    df = pd.DataFrame([row.as_dict() for row in rows])
     if df.empty:
         st.warning("該当するデータが存在しませんでした。")
         return
-
-    st.write(df)
-
-    with st.expander("実行したSQL",expanded=False):
-        st.code(sql16,language='sql')
-
+    st.write(rows)    
+ 
 
 # Query Acceleration Service sql16
 def main16():

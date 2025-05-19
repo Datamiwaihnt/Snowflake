@@ -21,7 +21,12 @@ entities:
         dest: resources/sql6_7.py
       - src: streamlit/resources/sql8_9.py
         dest: resources/sql8_9.py
-
+      - src: streamlit/resources/sql16.py
+        dest: resources/sql16.py
+      - src: streamlit/resources/sql17.py
+        dest: resources/sql17.py
+      - src: streamlit/resources/sql18.py
+        dest: resources/sql18.py
   sql_native_app:
     type: application
     from:

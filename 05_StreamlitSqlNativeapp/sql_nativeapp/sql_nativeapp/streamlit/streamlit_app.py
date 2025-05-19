@@ -15,6 +15,15 @@ pages = {
       "クエリ負荷":[
         st.Page("./resources/sql6_7.py",title="キュー待ち"),
         st.Page("./resources/sql8_9.py",title="トランザクションブロック")
+      ],  
+      "Acceleration":[
+        st.Page("./resources/sql16.py",title="Acceleration"),
+      ],            
+      "WH全体分析(簡易版)":[
+        st.Page("./resources/sql17.py",title="キュー待ち"),
+      ],            
+      "WH全体分析(詳細版)":[
+        st.Page("./resources/sql18.py",title="キュー待ち"),
       ]      
     
 }

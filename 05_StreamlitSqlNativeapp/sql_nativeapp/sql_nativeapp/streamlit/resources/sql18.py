@@ -32,8 +32,23 @@ def get_filter_inputs(key_suffix):
 
 # クエリ実行 sql18
 def execute_query18(begin_str, end_str):    
-    sql18 = f"""
-    with credits as (
+
+    df_query18 = session.call(
+    "code_schema.localSpill17",
+    begin_str,
+    end_str
+)
+
+    rows = df_query18.collect()
+    df = pd.DataFrame([row.as_dict() for row in rows])
+    if df.empty:
+        st.warning("該当するデータが存在しませんでした。")
+        return
+    st.write(rows)
+
+
+    query_text_sql18 = """
+     with credits as (
     select 
         warehouse_name::varchar warehouse_name,
         round(sum(credits_used),1) as credits_used
@@ -203,19 +218,10 @@ def execute_query18(begin_str, end_str):
         end desc,
         c.credits_used desc
     ;
-    """    
-    
-    query_result = session.sql(sql18).collect()
-    df = pd.DataFrame(query_result)
+    """.format(begin_str=begin_str, end_str=end_str)
 
-    if df.empty:
-        st.warning("該当するデータが存在しませんでした。")
-        return
-
-    st.write(df)
-
-    with st.expander("実行したSQL",expanded=False):
-        st.code(sql18,language='sql')
+    with st.expander("実行されたクエリを表示", expanded=False):
+        st.code(query_text_sql18, language="sql")
 
 
 # WH全体分析(詳細版) sql18
