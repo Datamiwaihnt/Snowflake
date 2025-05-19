@@ -21,6 +21,12 @@ entities:
         dest: resources/sql6_7.py
       - src: streamlit/resources/sql8_9.py
         dest: resources/sql8_9.py
+      - src: streamlit/resources/sql10_11.py
+        dest: resources/sql10_11.py
+      - src: streamlit/resources/sql12_13.py
+        dest: resources/sql12_13.py
+      - src: streamlit/resources/sql14_15.py
+        dest: resources/sql14_15.py
       - src: streamlit/resources/sql16.py
         dest: resources/sql16.py
       - src: streamlit/resources/sql17.py

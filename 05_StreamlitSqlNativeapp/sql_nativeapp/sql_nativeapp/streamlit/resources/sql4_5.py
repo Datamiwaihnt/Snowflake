@@ -111,13 +111,14 @@ def execute_query4(warehouse,begin_str, end_str):
             group by all
         )
     unpivot (sql_count for REMOTE_SPILLED_SIZE_RANGE in (
-        "0: REMOTE_SPILLED_SIZE = 0B", 
-        "1: 0B < REMOTE_SPILLED_SIZE <= 1MB",   
-        "2: 1MB < REMOTE_SPILLED_SIZE <= 1GB", 
-        "3: 1GB < REMOTE_SPILLED_SIZE <= 10GB", 
-        "4: 10GB < REMOTE_SPILLED_SIZE <= 100GB", 
-        "5: 100GB < REMOTE_SPILLED_SIZE <= 1TB",
-        "6: 1TB < REMOTE_SPILLED_SIZE"
+    "6: 1TB    < REMOTE_SPILLED_SIZE             ",
+    "5: 100GB  < REMOTE_SPILLED_SIZE <= 1TB      ",
+    "4: 10GB   < REMOTE_SPILLED_SIZE <= 100GB    ", 
+    "3: 1GB    < REMOTE_SPILLED_SIZE <= 10GB     ", 
+    "2: 1MB    < REMOTE_SPILLED_SIZE <= 1GB      ", 
+    "1: 0B     < REMOTE_SPILLED_SIZE <= 1MB      ",   
+    "0:        REMOTE_SPILLED_SIZE = 0B          "
+
     ))
     )
     select *, round(sql_count / total_count_sql * 100,2) ||'%' as "%SQL_COUNT" from sqlcnt_per_rspilled;

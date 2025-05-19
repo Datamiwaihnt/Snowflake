@@ -63,19 +63,21 @@ def execute_query2(warehouse,begin_str, end_str):
     st.write(rows)
     df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
 
-    spilled_size_order = [
-        "6: 1TB < REMOTE_SPILLED_SIZE",
-        "5: 100GB < REMOTE_SPILLED_SIZE <= 1TB",
-        "4: 10GB < REMOTE_SPILLED_SIZE <= 100GB", 
-        "3: 1GB < REMOTE_SPILLED_SIZE <= 10GB", 
-        "2: 1MB < REMOTE_SPILLED_SIZE <= 1GB", 
-        "1: 0B < REMOTE_SPILLED_SIZE <= 1MB",   
-        "0: REMOTE_SPILLED_SIZE = 0B"        
-
+    bar_order = [  
+    "6: 1TB < LOCAL_SPILLED_SIZE",
+    "5: 100GB < LOCAL_SPILLED_SIZE <= 1TB",
+    "4: 10GB < LOCAL_SPILLED_SIZE <= 100GB",
+    "3: 1GB < LOCAL_SPILLED_SIZE <= 10GB",
+    "2: 1MB < LOCAL_SPILLED_SIZE <= 1GB",
+    "1: 0B < LOCAL_SPILLED_SIZE <= 1MB",
+    "0: LOCAL_SPILLED_SIZE = 0B"
     ]
 
     bar_chart = alt.Chart(df).mark_bar().encode(
-        y=alt.Y('LOCAL_SPILLED_SIZE_RANGE', sort=spilled_size_order),
+        y=alt.Y(
+            'LOCAL_SPILLED_SIZE_RANGE', 
+            sort=bar_order,
+             ),
         x=alt.X('SQL_COUNT'),
         color='LOCAL_SPILLED_SIZE_RANGE',
         tooltip=['LOCAL_SPILLED_SIZE_RANGE', 'SQL_COUNT']
@@ -196,6 +198,7 @@ def main3():
 
 # タイトル表示
 st.markdown("<h1 style='color:teal;'>ローカルスピリング</h1>", unsafe_allow_html=True)
+
 
 # タブUI
 tab2, tab3 = st.tabs(["ローカルスピルサイズ範囲ごとのSQL数", "ローカルスピルが多いSQL"])
