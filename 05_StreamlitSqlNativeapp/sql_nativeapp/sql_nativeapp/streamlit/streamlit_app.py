@@ -15,17 +15,17 @@ pages = {
       "クエリ負荷":[
         st.Page("./resources/sql6_7.py",title="キュー待ち"),
         st.Page("./resources/sql8_9.py",title="トランザクションブロック")
-      ],  
-      "Acceleration":[
-        st.Page("./resources/sql16.py",title="Acceleration"),
-      ],            
-      "WH全体分析(簡易版)":[
-        st.Page("./resources/sql17.py",title="キュー待ち"),
-      ],            
-      "WH全体分析(詳細版)":[
-        st.Page("./resources/sql18.py",title="キュー待ち"),
-      ]      
-    
+      ],
+      "クエリ実行統計":[
+      st.Page("./resources/sql10_11.py",title="クエリ実行時間"),
+      st.Page("./resources/sql12_13.py",title="クエリスキャンサイズ"),
+      st.Page("./resources/sql14_15.py",title="スキャンパーティション割合")
+      ],
+      "その他":[
+      st.Page("./resources/sql16.py",title="Query Acceleration Service"),
+      st.Page("./resources/sql17.py",title="WH全体分析(簡易版)"),
+      st.Page("./resources/sql18.py",title="WH全体分析(詳細版)")
+      ]
 }
 
 pg = st.navigation(pages)
