@@ -62,15 +62,15 @@ def execute_query9(warehouse,begin_str, end_str):
         return
     st.write(rows)
 
-    df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
+    df['SQL_COUNT'] = df['%SQL_COUNT'].str.rstrip('%').astype(float)
 
     bar_order = [
-        "1: 0s < ELAPSED_TIME <= 1s",
-        "2: 1s < ELAPSED_TIME <= 10s",
-        "3: 10s < ELAPSED_TIME <= 60s",
-        "4: 60s < ELAPSED_TIME <= 600s",
+        "6: 3600s < ELAPSED_TIME",
         "5: 600s < ELAPSED_TIME <= 3600s",
-        "6: 3600s < ELAPSED_TIME"
+        "4: 60s < ELAPSED_TIME <= 600s",
+        "3: 10s < ELAPSED_TIME <= 60s",
+        "2: 1s < ELAPSED_TIME <= 10s",
+        "1: 0s < ELAPSED_TIME <= 1s"
     ]
 
     bar_chart = alt.Chart(df).mark_bar().encode(
@@ -79,7 +79,7 @@ def execute_query9(warehouse,begin_str, end_str):
         color='ELAPSED_TIME_RANGE',
         tooltip=['ELAPSED_TIME_RANGE', 'SQL_COUNT']
     ).properties(
-        title="TXブロック待ち発生状況"
+        title="クエリ実行範囲ごとのSQL"
     )
     
     st.altair_chart(bar_chart, use_container_width=True)
@@ -104,7 +104,7 @@ def execute_query9(warehouse,begin_str, end_str):
                 and warehouse_name = '{warehouse}'
                 and warehouse_size is not null
                 and total_elapsed_time > 0
-                and CONVERT_TIMEZONE('Asia/Tokyo', to_timestamp_ntz(START_TIME)) between '{begin_time}' AND '{end_time}'
+                and CONVERT_TIMEZONE('Asia/Tokyo', to_timestamp_ntz(START_TIME)) between '{begin_str}' AND '{end_str}'
                 group by all
             
             )
@@ -190,9 +190,9 @@ def main11():
 # タイトル表示
 st.markdown("<h1 style='color:teal;'>クエリ実行時間</h1>",unsafe_allow_html = True)
 # タブUI
-tab8, tab9 = st.tabs(["クエリ実行時間範囲ごとのSQL数", "クエリ実行時間が長いSQL"])
+tab8, tab9 = st.tabs(["クエリ実行時間の傾向", "クエリ実行時間が長いSQL"])
 with tab8:
-    st.markdown("### クエリ実行時間範囲ごとのSQL数",unsafe_allow_html = True)
+    st.markdown("### クエリ実行時間の傾向",unsafe_allow_html = True)
     main10()
 with tab9:
     st.markdown("### クエリ実行時間が長いSQL",unsafe_allow_html = True)

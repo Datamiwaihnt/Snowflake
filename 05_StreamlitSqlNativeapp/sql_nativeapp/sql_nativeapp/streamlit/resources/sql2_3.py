@@ -61,7 +61,7 @@ def execute_query2(warehouse,begin_str, end_str):
         st.warning("該当するデータが存在しませんでした。")
         return
     st.write(rows)
-    df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
+    df['SQL_COUNT'] = df['%SQL_COUNT'].str.rstrip('%').astype(float)
 
     bar_order = [  
     "6: 1TB < LOCAL_SPILLED_SIZE",
@@ -128,7 +128,7 @@ def execute_query2(warehouse,begin_str, end_str):
     TOTAL_COUNT_SQL,
     LOCAL_SPILLED_SIZE_RANGE,
     SQL_COUNT,
-    round(sql_count / total_count_sql * 100, 2) || '%' as PERCENT_SQL_COUNT
+    round(sql_count / total_count_sql * 100, 2) || '%' as "%SQL_COUNT"
     FROM sqlcnt_per_lspilled
     """.format(warehouse=warehouse, begin_str=begin_str, end_str=end_str)
 
@@ -201,10 +201,10 @@ st.markdown("<h1 style='color:teal;'>ローカルスピリング</h1>", unsafe_a
 
 
 # タブUI
-tab2, tab3 = st.tabs(["ローカルスピルサイズ範囲ごとのSQL数", "ローカルスピルが多いSQL"])
+tab2, tab3 = st.tabs(["ローカルスピルサイズ発生状況", "ローカルスピル発生量が多いSQL"])
 with tab2:
-    st.markdown("### ローカルスピルサイズ範囲ごとのSQL数")
+    st.markdown("### ローカルスピルサイズ発生状況")
     main2()
 with tab3:
-    st.markdown("### ローカルスピルが多いSQL")
+    st.markdown("### ローカルスピル発生量が多いSQL")
     main3()

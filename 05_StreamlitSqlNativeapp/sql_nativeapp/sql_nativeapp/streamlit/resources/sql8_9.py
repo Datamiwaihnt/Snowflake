@@ -62,7 +62,7 @@ def execute_query7(warehouse,begin_str, end_str):
         return
     st.write(rows)
 
-    df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
+    df['SQL_COUNT'] = df['%SQL_COUNT'].str.rstrip('%').astype(float)
 
     bar_order = [
         "5: 50% < ELAPSED_TIME_TXBLOCKED%", 
@@ -186,7 +186,7 @@ def main9():
         execute_query8(warehouse, begin_str, end_str)
 
 # タイトル表示
-st.markdown("<h1 style='color:teal;'>キュー待ち</h1>",unsafe_allow_html = True)
+st.markdown("<h1 style='color:teal;'>TXブロック</h1>",unsafe_allow_html = True)
 # タブUI
 tab8, tab9 = st.tabs(["TXブロック待ち発生状況", "TXブロック待ち時間が長いSQL"])
 with tab8:

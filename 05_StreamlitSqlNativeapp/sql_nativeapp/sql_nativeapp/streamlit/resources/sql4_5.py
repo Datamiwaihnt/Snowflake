@@ -62,7 +62,7 @@ def execute_query4(warehouse,begin_str, end_str):
         return
     st.write(rows)
 
-    df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
+    df['SQL_COUNT'] = df['%SQL_COUNT'].str.rstrip('%').astype(float)
 
     spilled_size_order = [
         "6: 1TB < LOCAL_SPILLED_SIZE", 
@@ -192,10 +192,10 @@ def main5():
 st.markdown("<h1 style='color:teal;'>リモートスピリング</h1>", unsafe_allow_html=True)
 
 # タブUI
-tab2, tab3 = st.tabs(["リモートスピルサイズ範囲ごとのSQL数", "リモートスピルが多いSQL"])
+tab2, tab3 = st.tabs(["リモートスピルサイズ発生状況", "リモートスピル発生量が多いSQL"])
 with tab2:
-    st.markdown("### リモートスピルサイズ範囲ごとのSQL数")
+    st.markdown("### リモートスピルサイズ発生状況")
     main4()
 with tab3:
-    st.markdown("### リモートスピルが多いSQL")
+    st.markdown("### リモートスピル発生量が多いSQL")
     main5()

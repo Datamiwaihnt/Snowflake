@@ -70,13 +70,13 @@ def execute_query11(warehouse,begin_str, end_str):
         return
     st.write(rows)
 
-    df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
+    df['SQL_COUNT'] = df['%SQL_COUNT'].str.rstrip('%').astype(float)
 
     bar_order = [
-        "1: 0B < SCAN_SIZE <= 1GB",				
-        "2: 1GB < SCAN_SIZE <= 20GB",					
-        "3: 20GB < SCAN_SIZE <= 50GB",					
-        "4: 50GB < SCAN_SIZE"	
+        "4: 50GB < SCAN_SIZE",
+        "3: 20GB < SCAN_SIZE <= 50GB",
+        "2: 1GB < SCAN_SIZE <= 20GB",
+        "1: 0B < SCAN_SIZE <= 1GB"
     ]
 
     bar_chart = alt.Chart(df).mark_bar().encode(
@@ -85,7 +85,7 @@ def execute_query11(warehouse,begin_str, end_str):
         color='SCAN_SIZE_RANGE',
         tooltip=['SCAN_SIZE_RANGE', 'SQL_COUNT']
     ).properties(
-        title="クエリスキャンサイズ範囲ごとのSQL数"
+        title="クエリスキャンサイズの傾向"
     )
     
     st.altair_chart(bar_chart, use_container_width=True)
@@ -190,10 +190,10 @@ def main13():
 # タイトル表示
 st.markdown("<h1 style='color:teal;'>クエリスキャンサイズ</h1>",unsafe_allow_html = True)
 # タブUI
-tab8, tab9 = st.tabs(["クエリスキャンサイズ範囲ごとのSQL数", "クエリスキャンサイズが多いSQL"])
+tab8, tab9 = st.tabs(["クエリスキャンサイズの傾向", "対象クエリスキャンサイズ範囲のSQL"])
 with tab8:
-    st.markdown("### クエリスキャンサイズ範囲ごとのSQL数",unsafe_allow_html = True)
+    st.markdown("### クエリスキャンサイズの傾向",unsafe_allow_html = True)
     main12()
 with tab9:
-    st.markdown("### クエリスキャンサイズが多いSQL",unsafe_allow_html = True)
+    st.markdown("### 対象クエリスキャンサイズ範囲のSQL",unsafe_allow_html = True)
     main13()

@@ -62,15 +62,15 @@ def execute_query13(warehouse,begin_str, end_str):
         return
     st.write(rows)
 
-    df['SQL_COUNT'] = df['PERCENT_SQL_COUNT'].str.rstrip('%').astype(float)
+    df['SQL_COUNT'] = df['%SCAN_PARTITION_RATIO'].str.rstrip('%').astype(float)
 
     bar_order = [
-        "1: 0 < SCAN_P_RATIO <= 1%",					
-        "2: 1 < SCAN_P_RATIO <= 10%",					
-        "3: 10 < SCAN_P_RATIO <= 30%", 					
-        "4: 30 < SCAN_P_RATIO <= 60%",					
-        "5: 60 < SCAN_P_RATIO <= 90%",					
-        "6: 90% < SCAN_P_RATIO"
+    "6: 90% < SCAN_P_RATIO",
+    "5: 60 < SCAN_P_RATIO <= 90%",
+    "4: 30 < SCAN_P_RATIO <= 60%",
+    "3: 10 < SCAN_P_RATIO <= 30%",
+    "2: 1 < SCAN_P_RATIO <= 10%",
+    "1: 0 < SCAN_P_RATIO <= 1%"
     ]
 
     bar_chart = alt.Chart(df).mark_bar().encode(
@@ -185,12 +185,12 @@ def main15():
         execute_query14(warehouse, begin_str, end_str)
 
 # タイトル表示
-st.markdown("<h1 style='color:teal;'>クエリスキャンサイズ</h1>",unsafe_allow_html = True)
+st.markdown("<h1 style='color:teal;'>スキャンパーティション割合</h1>",unsafe_allow_html = True)
 # タブUI
-tab8, tab9 = st.tabs(["クエリスキャンサイズ範囲ごとのSQL数", "クエリスキャンサイズが多いSQL"])
+tab8, tab9 = st.tabs(["スキャンパーティション割合の傾向", "フルスキャンSQL"])
 with tab8:
-    st.markdown("### クエリスキャンサイズ範囲ごとのSQL数",unsafe_allow_html = True)
+    st.markdown("### スキャンパーティション割合の傾向",unsafe_allow_html = True)
     main14()
 with tab9:
-    st.markdown("### クエリスキャンサイズが多いSQL",unsafe_allow_html = True)
+    st.markdown("### フルスキャンSQL",unsafe_allow_html = True)
     main15()

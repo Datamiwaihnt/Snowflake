@@ -59,7 +59,7 @@ RETURNS TABLE(
   TOTAL_COUNT_SQL NUMBER,
   LOCAL_SPILLED_SIZE_RANGE STRING,
   SQL_COUNT NUMBER,
-  PERCENT_SQL_COUNT STRING
+  "%SQL_COUNT" STRING
 )
 LANGUAGE SQL
 AS
@@ -105,7 +105,7 @@ DECLARE
       TOTAL_COUNT_SQL,
       LOCAL_SPILLED_SIZE_RANGE,
       SQL_COUNT,
-      round(sql_count / total_count_sql * 100, 2) || '%' as PERCENT_SQL_COUNT
+      round(sql_count / total_count_sql * 100, 2) || '%' as "%SQL_COUNT"
     FROM sqlcnt_per_lspilled
   );
 BEGIN
@@ -114,7 +114,7 @@ END;
 
 GRANT USAGE ON PROCEDURE code_schema.localSpill1(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
 
-//プロシージャ定義ローカルスピル発生量が多いSQL
+//ローカルスピル発生量が多いSQL
 CREATE OR REPLACE PROCEDURE code_schema.localSpill2(
   warehouse STRING,
   begin_str STRING,
@@ -174,7 +174,7 @@ RETURNS TABLE(
   TOTAL_COUNT_SQL NUMBER,
   REMOTE_SPILLED_SIZE_RANGE STRING,
   SQL_COUNT NUMBER,
-  PERCENT_SQL_COUNT STRING
+  "%SQL_COUNT" STRING
 )
 LANGUAGE SQL
 AS
@@ -220,7 +220,7 @@ DECLARE
       TOTAL_COUNT_SQL,
       REMOTE_SPILLED_SIZE_RANGE,
       SQL_COUNT,
-      round(sql_count / total_count_sql * 100, 2) || '%' as PERCENT_SQL_COUNT
+      round(sql_count / total_count_sql * 100, 2) || '%' as "%SQL_COUNT"
     FROM sqlcnt_per_rspilled
   );
 BEGIN
@@ -401,7 +401,7 @@ RETURNS TABLE(
   TOTAL_COUNT_SQL NUMBER,
   TXBLOCKED_PERCENT_RANGE STRING,
   SQL_COUNT NUMBER,
-  PERCENT_SQL_COUNT STRING
+  "%SQL_COUNT" STRING
 )
 LANGUAGE SQL
 AS
@@ -444,7 +444,7 @@ DECLARE
       TOTAL_COUNT_SQL,
       TXBLOCKED_PERCENT_RANGE,
       SQL_COUNT,
-      round(sql_count / total_count_sql * 100, 2) || '%' as PERCENT_SQL_COUNT
+      round(sql_count / total_count_sql * 100, 2) || '%' as "%SQL_COUNT"
     FROM sqlcnt_per_txblocked_percent
   );
 BEGIN
@@ -511,7 +511,7 @@ RETURNS TABLE(
   TOTAL_COUNT_SQL NUMBER,
   ELAPSED_TIME_RANGE STRING,
   SQL_COUNT NUMBER,
-  PERCENT_SQL_COUNT STRING
+  "%SQL_COUNT" STRING
 )
 LANGUAGE SQL
 AS
@@ -529,7 +529,6 @@ DECLARE
           COUNT(CASE WHEN (total_elapsed_time / 1000) > 60  and (total_elapsed_time / 1000) <= 600 THEN 1 ELSE NULL END)    AS "4: 60s < ELAPSED_TIME <= 600s",
           COUNT(CASE WHEN (total_elapsed_time / 1000) > 600 and (total_elapsed_time / 1000) <= 3600 THEN 1 ELSE NULL END)   AS "5: 600s < ELAPSED_TIME <= 3600s",
           COUNT(CASE WHEN (total_elapsed_time / 1000) > 3600 THEN 1 ELSE NULL END) AS "6: 3600s < ELAPSED_TIME", 
-
        FROM snowflake.account_usage.query_history
         WHERE execution_status = 'SUCCESS'
           AND warehouse_name = :warehouse
@@ -541,13 +540,12 @@ DECLARE
       )
       UNPIVOT (
         sql_count FOR elapsed_time_range IN (
-              "1: 0s < ELAPSED_TIME <= 1s",
-              "2: 1s < ELAPSED_TIME <= 10s",
-              "3: 10s < ELAPSED_TIME <= 60s",
-              "4: 60s < ELAPSED_TIME <= 600s",
-              "5: 600s < ELAPSED_TIME <= 3600s",
-              "6: 3600s < ELAPSED_TIME"
-
+            "6: 3600s < ELAPSED_TIME",
+            "5: 600s < ELAPSED_TIME <= 3600s",
+            "4: 60s < ELAPSED_TIME <= 600s",
+            "3: 10s < ELAPSED_TIME <= 60s",
+            "2: 1s < ELAPSED_TIME <= 10s",
+            "1: 0s < ELAPSED_TIME <= 1s"
         )
       )
     )
@@ -557,7 +555,7 @@ DECLARE
       TOTAL_COUNT_SQL,
       ELAPSED_TIME_RANGE,
       SQL_COUNT,
-      round(sql_count / total_count_sql * 100, 3) || '%' as PERCENT_SQL_COUNT
+      round(sql_count / total_count_sql * 100, 2) || '%' as "%SQL_COUNT"
     FROM sqlcnt_per_range
   );
 BEGIN
@@ -580,7 +578,7 @@ RETURNS TABLE(
   QUERY_ID STRING,
   QUERY_TEXT STRING,
   START_TIME TIMESTAMP_TZ,
-  TOTAL_ELAPSED_TIME_S NUMBER
+  TOTAL_ELAPSED_TIME_S NUMBER(10,1)
 )
 LANGUAGE SQL
 AS
@@ -622,7 +620,7 @@ RETURNS TABLE(
   TOTAL_COUNT_SQL NUMBER,
   SCAN_SIZE_RANGE STRING,
   SQL_COUNT NUMBER,
-  PERCENT_SQL_COUNT STRING
+  "%SQL_COUNT" STRING
 )
 LANGUAGE SQL
 AS
@@ -649,10 +647,10 @@ DECLARE
       )
       UNPIVOT (
         sql_count FOR scan_size_range IN (
-            "1: 0B < SCAN_SIZE <= 1GB",					
-            "2: 1GB < SCAN_SIZE <= 20GB", 					
-            "3: 20GB < SCAN_SIZE <= 50GB",					
-            "4: 50GB < SCAN_SIZE"					
+          "4: 50GB < SCAN_SIZE",
+          "3: 20GB < SCAN_SIZE <= 50GB",
+          "2: 1GB < SCAN_SIZE <= 20GB",
+          "1: 0B < SCAN_SIZE <= 1GB"
         )
       )
     )
@@ -662,7 +660,7 @@ DECLARE
       TOTAL_COUNT_SQL,
       SCAN_SIZE_RANGE,
       SQL_COUNT,
-      round(sql_count / total_count_sql * 100, 1) || '%' as PERCENT_SQL_COUNT
+      round(sql_count / total_count_sql * 100, 1) || '%' as "%SQL_COUNT"
     FROM sqlcnt_per_scansize
   );
 BEGIN
@@ -731,7 +729,7 @@ RETURNS TABLE(
   TOTAL_COUNT_SQL NUMBER,
   SCAN_PARTITION_RATO_RANGE STRING,
   SQL_COUNT NUMBER,
-  PERCENT_SQL_COUNT STRING
+  "%SCAN_PARTITION_RATIO" STRING
 )
 LANGUAGE SQL
 AS
@@ -760,12 +758,12 @@ DECLARE
       )
       UNPIVOT (
         sql_count FOR SCAN_PARTITION_RATO_RANGE IN (
-              "1: 0 < SCAN_P_RATIO <= 1%",					
-              "2: 1 < SCAN_P_RATIO <= 10%",					
-              "3: 10 < SCAN_P_RATIO <= 30%", 					
-              "4: 30 < SCAN_P_RATIO <= 60%",					
-              "5: 60 < SCAN_P_RATIO <= 90%",					
-              "6: 90% < SCAN_P_RATIO"					
+            "6: 90% < SCAN_P_RATIO",
+            "5: 60 < SCAN_P_RATIO <= 90%",
+            "4: 30 < SCAN_P_RATIO <= 60%",
+            "3: 10 < SCAN_P_RATIO <= 30%",
+            "2: 1 < SCAN_P_RATIO <= 10%",
+            "1: 0 < SCAN_P_RATIO <= 1%"
             )
       )
     )
@@ -775,7 +773,7 @@ DECLARE
       TOTAL_COUNT_SQL,
       SCAN_PARTITION_RATO_RANGE,
       SQL_COUNT,
-      round(sql_count / total_count_sql * 100, 1) || '%' as PERCENT_SQL_COUNT
+      round(sql_count / total_count_sql * 100, 1) || '%' as "%SCAN_PARTITION_RATIO"
     FROM scan_partition_ratio
   );
 BEGIN
