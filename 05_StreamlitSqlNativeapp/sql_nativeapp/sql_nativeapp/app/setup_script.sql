@@ -9,18 +9,30 @@ CREATE STREAMLIT IF NOT EXISTS code_schema.sql_native_streamlit
 ;
 GRANT USAGE ON STREAMLIT code_schema.sql_native_streamlit TO APPLICATION ROLE sql_native_app;
 
-//プロシージャの定義
-CREATE OR REPLACE PROCEDURE code_schema.HELLO()
-  RETURNS STRING
-  LANGUAGE SQL
-  EXECUTE AS OWNER
-  AS
-  BEGIN
-    RETURN 'Hello Snowflake!';
-  END;
+//sql1プロシージャの定義
+CREATE OR REPLACE PROCEDURE code_schema.show_warehouse_proc()
+RETURNS TABLE()
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.8'
+HANDLER = 'main'
+PACKAGES = ('snowflake-snowpark-python')
+AS
+$$
+def main(session):
+    # SHOW WAREHOUSES を実行
+    session.sql("SHOW WAREHOUSES").collect()
 
-//プロシージャの権限付与
-GRANT USAGE ON PROCEDURE code_schema.hello() TO APPLICATION ROLE sql_native_app;
+    # クエリIDを明示的に取得
+    query_id_row = session.sql("SELECT LAST_QUERY_ID()").collect()
+    query_id = query_id_row[0][0]  # クエリIDを取り出す
+
+    # クエリIDをもとに結果をSELECTする
+    df = session.sql(f'SELECT * FROM TABLE(RESULT_SCAN(\'{query_id}\'))')
+    return df
+$$;
+
+//プロシージャsshow_warehouseの権限付与
+GRANT USAGE ON PROCEDURE code_schema.show_warehouse_proc() TO APPLICATION ROLE func_cost_estimate;
 
 //sql1プロシージャの定義
 CREATE OR REPLACE PROCEDURE code_schema.show_warehouse_proc()
@@ -45,7 +57,7 @@ def main(session):
 $$;
 
 //プロシージャsshow_warehouseの権限付与
-GRANT USAGE ON PROCEDURE code_schema.show_warehouse_proc() TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.show_warehouse_proc() TO APPLICATION ROLE func_cost_estimate;
 
 //プロシージャ(ローカルスピルサイズ範囲ごとのSQL数)
 CREATE OR REPLACE PROCEDURE code_schema.localSpill1(
@@ -112,7 +124,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill1(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill1(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 //ローカルスピル発生量が多いSQL
 CREATE OR REPLACE PROCEDURE code_schema.localSpill2(
@@ -159,7 +171,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill2(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill2(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //プロシージャリモートスピルサイズ発生状況
@@ -227,7 +239,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill3(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill3(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //リモートスピル発生量が多いSQL
@@ -275,7 +287,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill4(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill4(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 //キュー待ち発生状況
 CREATE OR REPLACE PROCEDURE code_schema.localSpill5(
@@ -289,57 +301,50 @@ RETURNS TABLE(
   TOTAL_COUNT_SQL NUMBER,
   QUEUED_PERCENT_RANGE STRING,
   SQL_COUNT NUMBER,
-  PERCENT_SQL_COUNT STRING
+  "%SQL_COUNT" STRING
 )
 LANGUAGE SQL
 AS
 DECLARE
   res RESULTSET DEFAULT (
-    WITH sqlcnt_per_queued_percent AS (
-      SELECT * FROM (
-        SELECT
-          warehouse_name,
-          warehouse_size,
-          COUNT(*) total_count_sql,
-          COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) = 0 THEN 1 ELSE NULL END)                                                               AS "0: ELAPSED_TIME_QUEUED% = 0%",
-          COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0      and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.01 THEN 1 ELSE NULL END)  AS "1: 0% < ELAPSED_TIME_QUEUED% <= 1%",
-          COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.01   and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.05 THEN 1 ELSE NULL END)  AS "2: 1% < ELAPSED_TIME_QUEUED% <= 5%",
-          COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.05   and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.2 THEN 1 ELSE NULL END)   AS "3: 5% < ELAPSED_TIME_QUEUED% <= 20%",
-          COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.2    and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.5 THEN 1 ELSE NULL END)   AS "4: 20% < ELAPSED_TIME_QUEUED% <= 50%",
-          COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.5 THEN 1 ELSE NULL END)                                                             AS "5: 50% < ELAPSED_TIME_QUEUED%" 
-       FROM snowflake.account_usage.query_history
-        WHERE execution_status = 'SUCCESS'
-        AND warehouse_name = :warehouse
-        AND warehouse_size IS NOT NULL
-        AND CONVERT_TIMEZONE('Asia/Tokyo', TO_TIMESTAMP_NTZ(START_TIME)) 
-              BETWEEN :begin_str AND :end_str
-        GROUP BY ALL
-      )
-      UNPIVOT (
-        sql_count FOR queued_percent_range IN (
-        "0: ELAPSED_TIME_QUEUED% = 0%",
-        "1: 0% < ELAPSED_TIME_QUEUED% <= 1%",
-        "2: 1% < ELAPSED_TIME_QUEUED% <= 5%",
-        "3: 5% < ELAPSED_TIME_QUEUED% <= 20%",
-        "4: 20% < ELAPSED_TIME_QUEUED% <= 50%",
-        "5: 50% < ELAPSED_TIME_QUEUED%"        
+    with sqlcnt_per_queued_percent as (
+    select * from
+        (
+            select
+               warehouse_name,
+               warehouse_size,
+               COUNT(*) total_count_sql,
+               COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) = 0 THEN 1 ELSE NULL END)                                                               AS "0: ELAPSED_TIME_QUEUED% = 0%",
+               COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0      and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.01 THEN 1 ELSE NULL END)  AS "1: 0% < ELAPSED_TIME_QUEUED% <= 1%",
+               COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.01   and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.05 THEN 1 ELSE NULL END)  AS "2: 1% < ELAPSED_TIME_QUEUED% <= 5%",
+               COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.05   and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.2 THEN 1 ELSE NULL END)   AS "3: 5% < ELAPSED_TIME_QUEUED% <= 20%",
+               COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.2    and (QUEUED_OVERLOAD_TIME / total_elapsed_time) <= 0.5 THEN 1 ELSE NULL END)   AS "4: 20% < ELAPSED_TIME_QUEUED% <= 50%",
+               COUNT(CASE WHEN (QUEUED_OVERLOAD_TIME / total_elapsed_time) > 0.5 THEN 1 ELSE NULL END)                                                             AS "5: 50% < ELAPSED_TIME_QUEUED%" 
+            from
+                snowflake.account_usage.query_history
+            where
+                execution_status = 'SUCCESS'
+            and warehouse_name = :warehouse
+            and warehouse_size is not null
+            and CONVERT_TIMEZONE('Asia/Tokyo',to_timestamp_ntz(START_TIME)) between :begin_str AND :end_str
+            group by all
         )
-      )
+    unpivot (sql_count for queued_percent_range in (
+        "5: 50% < ELAPSED_TIME_QUEUED%",
+        "4: 20% < ELAPSED_TIME_QUEUED% <= 50%",
+        "3: 5% < ELAPSED_TIME_QUEUED% <= 20%",
+        "2: 1% < ELAPSED_TIME_QUEUED% <= 5%",
+        "1: 0% < ELAPSED_TIME_QUEUED% <= 1%",
+        "0: ELAPSED_TIME_QUEUED% = 0%"
+    ))
     )
-    SELECT 
-      WAREHOUSE_NAME,
-      WAREHOUSE_SIZE,
-      TOTAL_COUNT_SQL,
-      QUEUED_PERCENT_RANGE,
-      SQL_COUNT,
-      round(sql_count / total_count_sql * 100, 2) || '%' as PERCENT_SQL_COUNT
-    FROM sqlcnt_per_queued_percent
+    select *, round(sql_count / total_count_sql * 100,1) ||'%' as "%SQL_COUNT" from sqlcnt_per_queued_percent
   );
 BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill5(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill5(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 
@@ -386,7 +391,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill6(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill6(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //trxブロック発生状況
@@ -451,7 +456,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill7(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill7(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 //TXブロック待ち時間が長いSQL
 CREATE OR REPLACE PROCEDURE code_schema.localSpill8(
@@ -496,7 +501,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill8(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill8(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //クエリ実行時間の傾向
@@ -562,7 +567,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill9(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill9(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 
@@ -605,7 +610,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill10(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill10(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //クエリスキャンサイズの傾向
@@ -667,7 +672,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill11(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill11(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //対象クエリスキャンサイズ範囲のSQL
@@ -712,7 +717,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill12(STRING,STRING,STRING,NUMBER,NUMBER) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill12(STRING,STRING,STRING,NUMBER,NUMBER) TO APPLICATION ROLE func_cost_estimate;
 
 
 
@@ -780,7 +785,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill13(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill13(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 
@@ -829,7 +834,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill14(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill14(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 
@@ -865,7 +870,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill15(STRING,STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill15(STRING,STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 //WH簡易分析
@@ -959,7 +964,7 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill16(STRING,STRING) TO APPLICATION ROLE sql_native_app;
+GRANT USAGE ON PROCEDURE code_schema.localSpill16(STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
 
 
@@ -1250,6 +1255,5 @@ BEGIN
   RETURN TABLE(res);
 END;
 
-GRANT USAGE ON PROCEDURE code_schema.localSpill17(STRING,STRING) TO APPLICATION ROLE sql_native_app;
-
+GRANT USAGE ON PROCEDURE code_schema.localSpill17(STRING,STRING) TO APPLICATION ROLE func_cost_estimate;
 
